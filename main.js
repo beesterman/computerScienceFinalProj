@@ -17,7 +17,9 @@ const CameraControls = new OrbitControls(camera, renderer.domElement);
 CameraControls.minDistance = 1;
 CameraControls.maxDistance = 300;
 
+let ambientLight = new THREE.AmbientLight(0x404040);
 
+scene.add(ambientLight);
 
 // setting up blueprint for planets
 class Planet {
