@@ -83,8 +83,7 @@ const earthMaterial = new THREE.MeshPhongMaterial({
 const earthSphere = new THREE.Mesh( earthGeometry, earthMaterial );
 earthSphere.rotation.z += toRadians(earth.axialTilt);
 earthSphere.position.set(2,2,2);
-scene.add(earthSphere);
-// earthGroup.add(earthGeometry);
+earthGroup.add(earthGeometry);
 
 
 
@@ -99,14 +98,19 @@ earthSphere.receiveShadow = true;
 
 
 // configuring camera to be in a reasonable location
-camera.position.set(2.0 * sun.size, 2.0 * sun.size, 2.0 * sun.size);
+camera.position.set(-3.0 * sun.size, 3.0 * sun.size, 3.0 * sun.size);
+CameraControls.target.set(0, 0, 0);
+CameraControls.update();
+
+
 
 function animate( time ) {
-
+  //controlls the divisor for the time of rotation
+  let divisor = 1000
   
-  sunSphere.rotation.y = (time / 1000) * sun.rotationSpeed;
-  earthSphere.rotation.y = (time / 1000) * earth.rotationSpeed;
+  sunSphere.rotation.y = (time / divisor) * sun.rotationSpeed;
+  earthSphere.rotation.y = (time / divisor) * earth.rotationSpeed;
 
   renderer.render( scene, camera );
 
-}
+} 
