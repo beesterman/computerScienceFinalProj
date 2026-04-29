@@ -126,9 +126,9 @@ class Planet {
 }
 
 // find the info used to calculate these numbers here: https://science.nasa.gov/solar-system/planets/planet-sizes-and-locations-in-our-solar-system/
-let earth = new Planet(1.0, 0.05, 1000.0, 23.5, 50.0, -90.0);
-let jupiter = new Planet(earth.size * 11.2, earth.rotationSpeed * 0.41, earth.orbitalSpeed * 11.8, 3.0, earth.orbitSize * 5.2, earth.orbitalTilt + 1.31);
-let saturn = new Planet(earth.size * 9.45, earth.rotationSpeed * 0.45, earth.orbitalSpeed * 11.8, 26.37, earth.orbitSize * 9.5, earth.orbitalTilt + 2.49);
+let earth = new Planet(0.5, 365.0, 10.0, 23.5, 10.0, -90.0);
+let jupiter = new Planet(earth.size * 11.2, earth.rotationSpeed * 2.42, earth.orbitalSpeed * 12.0, 3.0, earth.orbitSize * 5.2, earth.orbitalTilt + 1.31);
+let saturn = new Planet(earth.size * 9.45, earth.rotationSpeed * 2.24, earth.orbitalSpeed * 29.4, 26.37, earth.orbitSize * 9.5, earth.orbitalTilt + 2.49);
 let uranus = new Planet(earth.size * 4.0, earth.rotationSpeed * 0.71, earth.orbitalSpeed * 84, 97.77, earth.orbitSize * 19.2, earth.orbitalTilt + 0.77);
 let neptune = new Planet(earth.size * 3.88, earth.rotationSpeed * 0.67, earth.orbitalSpeed * 165.0, 28.0, earth.orbitSize * 30.1, earth.orbitalTilt + 1.77);
 let venus = new Planet(earth.size * 0.95, earth.rotationSpeed * 0.004, earth.orbitalSpeed * 0.61, 3.0, earth.orbitSize * 0.72, earth.orbitalTilt + 3.39);
@@ -162,7 +162,7 @@ scene.add(earthOrbit)
 let mercuryGroup = new THREE.Group()
 const mercuryCurve = new THREE.EllipseCurve(
   //  need to shift the center of the curve to make it look like real life
-  0, 5, //center of the elipse x,y
+  0, 1, //center of the elipse x,y
   mercury.orbitSize, mercury.orbitSize, //x then y radius
   0, 2 * Math.PI, //Start and end angle
 )
@@ -230,6 +230,23 @@ jupiter.elipse = jupiterCurve;
 jupiter.orbitLine = jupiterOrbit;
 scene.add(jupiterOrbit)
 
+//saturn
+let saturnGroup = new THREE.Group()
+const saturnCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 0, //center of the elipse x,y
+  saturn.orbitSize, saturn.orbitSize, //x then y radius
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const saturnPoints = saturnCurve.getPoints(1000);
+const saturnOrbitGeometry = new THREE.BufferGeometry().setFromPoints(saturnPoints);
+const saturnOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const saturnOrbit = new THREE.Line(saturnOrbitGeometry, saturnOrbitMaterial);
+saturnOrbit.rotateX(toRadians(saturn.orbitalTilt))
+saturn.elipse = saturnCurve;
+saturn.orbitLine = saturnOrbit;
+scene.add(saturnOrbit)
 
 
 
@@ -320,6 +337,19 @@ jupiterGroup.add(jupiterSphere);
 jupiter.planetGroup = jupiterGroup;
 scene.add(jupiterGroup)
 
+//saturn
+const saturnTexture = textureLoader.load('statics/images/saturnTexture.jpg')
+const saturnGeometry = new THREE.SphereGeometry(saturn.size);
+const saturnMaterial = new THREE.MeshPhongMaterial({
+  map: saturnTexture,
+  shininess: 0.3,
+});
+const saturnSphere = new THREE.Mesh( saturnGeometry, saturnMaterial );
+saturnSphere.rotation.z += toRadians(saturn.axialTilt);
+saturnSphere.position.set(0,0,0);
+saturnGroup.add(saturnSphere);
+saturn.planetGroup = saturnGroup;
+scene.add(saturnGroup)
 
 
 
@@ -342,6 +372,8 @@ marsSphere.castShadow = true;
 marsSphere.receiveShadow = true;
 jupiterSphere.castShadow = true;
 jupiterSphere.receiveShadow = true;
+saturnSphere.castShadow = true;
+saturnSphere.receiveShadow = true;
 
 // configuring camera to be in a reasonable location
 camera.position.set(-3.0 * earth.orbitSize, 3.0 * earth.orbitSize, 3.0 * earth.orbitSize);
@@ -367,6 +399,7 @@ function animate( time ) {
   venusSphere.rotation.y = -(time / divisor) * venus.rotationSpeed;
   marsSphere.rotation.y = (time / divisor) * mars.rotationSpeed;
   jupiterSphere.rotation.y = (time / divisor) * jupiter.rotationSpeed;
+  saturnSphere.rotation.y = (time / divisor) * saturn.rotationSpeed;
 //---------------------------------------------------------------------
 // Planet Orbital Rotation Update
 // ---------------------------------------------------------------------
@@ -376,6 +409,7 @@ function animate( time ) {
   updatePlanetRotation(venus, time);
   updatePlanetRotation(mars, time);
   updatePlanetRotation(jupiter, time);
+  updatePlanetRotation(saturn, time);
 
 
 
