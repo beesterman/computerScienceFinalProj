@@ -16,14 +16,15 @@ const textureLoader = new THREE.TextureLoader();
 // this is the controlls for the mouse
 const CameraControls = new OrbitControls(camera, renderer.domElement);
 CameraControls.minDistance = 0;
-CameraControls.maxDistance = 300;
+CameraControls.maxDistance = 3000;
 CameraControls.zoomToCursor = true;
 
 const pressedKeys = new Set();
-const cameraMoveSpeed = 40;
+const cameraMoveSpeed = 100;
 const cameraMoveDirection = new THREE.Vector3();
 const cameraForward = new THREE.Vector3();
 const cameraRight = new THREE.Vector3();
+const orbitPoint = new THREE.Vector3();
 let previousFrameTime = 0;
 
 window.addEventListener('keydown', (event) => {
@@ -46,10 +47,11 @@ function updatePlanetRotation(planet, time = performance.now()) {
   const orbitProgress = (seconds / planet.orbitalSpeed) % earth.orbitalSpeed;
 
   const p = planet.elipse.getPoint(orbitProgress);
-  
+  orbitPoint.set(p.x, p.y, 0);
+  planet.orbitLine.updateWorldMatrix(true, false);
+  planet.orbitLine.localToWorld(orbitPoint);
 
-  planet.planetGroup.position.x = p.x;
-  planet.planetGroup.position.z = p.y;
+  planet.planetGroup.position.copy(orbitPoint);
 }
 
 function updateCameraMovement(deltaSeconds) {
@@ -108,7 +110,7 @@ scene.background = skyboxCubemap;
 // ---------------------------------------------------------------------
 // setting up blueprint for planets
 class Planet {
-    constructor(size, rotationSpeed, orbitalSpeed, axialTilt, orbitSize, elipse, planetGroup) {
+    constructor(size, rotationSpeed, orbitalSpeed, axialTilt, orbitSize, orbitalTilt, orbitLine, planetGroup) {
         //these are calculated using meteres as a ratio
         this.size = size
         this.rotationSpeed = rotationSpeed
@@ -116,22 +118,23 @@ class Planet {
         this.axialTilt = axialTilt
         // This is calculated using AU
         this.orbitSize = orbitSize
+        this.orbitalTilt = orbitalTilt
         //this is the points from the orbit calculated above
-        this.elipse = elipse
+        this.orbitLine = orbitLine
         this.planetGroup = planetGroup
     }
 }
 
 // find the info used to calculate these numbers here: https://science.nasa.gov/solar-system/planets/planet-sizes-and-locations-in-our-solar-system/
-let earth = new Planet(1.0, 0.05, 1000.0, 23.5, 100);
-let jupiter = new Planet(earth.size * 11.2, earth.rotationSpeed * 0.41, earth.orbitalSpeed * 11.8, 3.0);
-let saturn = new Planet(earth.size * 9.45, earth.rotationSpeed * 0.45, earth.orbitalSpeed * 11.8, 26.37);
-let uranus = new Planet(earth.size * 4.0, earth.rotationSpeed * 0.71, earth.orbitalSpeed * 84, 97.77);
-let neptune = new Planet(earth.size * 3.88, earth.rotationSpeed * 0.67, earth.orbitalSpeed * 165.0, 28.0);
-let venus = new Planet(earth.size * 0.95, earth.rotationSpeed * 243.0, earth.orbitalSpeed * 225.0, 3.0);
-let mars = new Planet(earth.size * 0.53, earth.rotationSpeed * 1.025, earth.orbitalSpeed * 687.0, 25.0);
-let mercury = new Planet(earth.size * 0.38, earth.rotationSpeed * 59.0, earth.orbitalSpeed * 0.241, 2.0);
-let pluto = new Planet(earth.size * 0.19, earth.rotationSpeed * 6.38, earth.orbitalSpeed * 248.0, 57.0);
+let earth = new Planet(0.5, 365.0, 10.0, 23.5, 10.0, -90.0);
+let jupiter = new Planet(earth.size * 11.2, earth.rotationSpeed * 2.42, earth.orbitalSpeed * 12.0, 3.0, earth.orbitSize * 5.2, earth.orbitalTilt + 1.31);
+let saturn = new Planet(earth.size * 9.45, earth.rotationSpeed * 2.24, earth.orbitalSpeed * 29.4, 26.37, earth.orbitSize * 9.5, earth.orbitalTilt + 2.49);
+let uranus = new Planet(earth.size * 4.0, earth.rotationSpeed * 0.71, earth.orbitalSpeed * 84, 97.77, earth.orbitSize * 19.2, earth.orbitalTilt + 0.77);
+let neptune = new Planet(earth.size * 3.88, earth.rotationSpeed * 0.67, earth.orbitalSpeed * 165.0, 28.0, earth.orbitSize * 30.1, earth.orbitalTilt + 1.77);
+let venus = new Planet(earth.size * 0.95, earth.rotationSpeed * 0.004, earth.orbitalSpeed * 0.61, 3.0, earth.orbitSize * 0.72, earth.orbitalTilt + 3.39);
+let mars = new Planet(earth.size * 0.53, earth.rotationSpeed * 1.025, earth.orbitalSpeed * 1.88, 25.0, earth.orbitSize * 1.52, earth.orbitalTilt + 1.85);
+let mercury = new Planet(earth.size * 0.38, earth.rotationSpeed * 59.0, earth.orbitalSpeed * 0.241, 2.0, earth.orbitSize * 0.39, earth.orbitalTilt + 7.01);
+let pluto = new Planet(earth.size * 0.19, earth.rotationSpeed * 6.38, earth.orbitalSpeed * 248.0, 57.0, earth.orbitSize * 39.5, earth.orbitalTilt + 17.14);
 let sun = new Planet(earth.size * 2.0, earth.rotationSpeed * 36.0, 0.0, 0);
 const planetArray = [earth, jupiter, saturn, uranus, neptune, venus, mars, mercury, pluto]
 
@@ -150,15 +153,154 @@ const earthPoints = earthCurve.getPoints(1000);
 const earthOrbitGeometry = new THREE.BufferGeometry().setFromPoints(earthPoints);
 const earthOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
 const earthOrbit = new THREE.Line(earthOrbitGeometry, earthOrbitMaterial);
-earthOrbit.rotateX(toRadians(-90))
+earthOrbit.rotateX(toRadians(earth.orbitalTilt))
 earth.elipse = earthCurve;
+earth.orbitLine = earthOrbit;
 scene.add(earthOrbit)
 
+//mercury
+let mercuryGroup = new THREE.Group()
+const mercuryCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 1, //center of the elipse x,y
+  mercury.orbitSize, mercury.orbitSize, //x then y radius
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const mercuryPoints = mercuryCurve.getPoints(1000);
+const mercuryOrbitGeometry = new THREE.BufferGeometry().setFromPoints(mercuryPoints);
+const mercuryOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const mercuryOrbit = new THREE.Line(mercuryOrbitGeometry, mercuryOrbitMaterial);
+mercuryOrbit.rotateX(toRadians(mercury.orbitalTilt))
+mercury.elipse = mercuryCurve;
+mercury.orbitLine = mercuryOrbit;
+scene.add(mercuryOrbit)
 
+//venus
+let venusGroup = new THREE.Group()
+const venusCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 0, //center of the elipse x,y
+  venus.orbitSize, venus.orbitSize, //x then y radius
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const venusPoints = venusCurve.getPoints(1000);
+const venusOrbitGeometry = new THREE.BufferGeometry().setFromPoints(venusPoints);
+const venusOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const venusOrbit = new THREE.Line(venusOrbitGeometry, venusOrbitMaterial);
+venusOrbit.rotateX(toRadians(venus.orbitalTilt))
+venus.elipse = venusCurve;
+venus.orbitLine = venusOrbit;
+scene.add(venusOrbit)
 
+//mars
+let marsGroup = new THREE.Group()
+const marsCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 0, //center of the elipse x,y
+  mars.orbitSize, mars.orbitSize, //x then y radius
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const marsPoints = marsCurve.getPoints(1000);
+const marsOrbitGeometry = new THREE.BufferGeometry().setFromPoints(marsPoints);
+const marsOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const marsOrbit = new THREE.Line(marsOrbitGeometry, marsOrbitMaterial);
+marsOrbit.rotateX(toRadians(mars.orbitalTilt))
+mars.elipse = marsCurve;
+mars.orbitLine = marsOrbit;
+scene.add(marsOrbit)
 
+//jupiter
+let jupiterGroup = new THREE.Group()
+const jupiterCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 0, //center of the elipse x,y
+  jupiter.orbitSize, jupiter.orbitSize, //x then y radius
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const jupiterPoints = jupiterCurve.getPoints(1000);
+const jupiterOrbitGeometry = new THREE.BufferGeometry().setFromPoints(jupiterPoints);
+const jupiterOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const jupiterOrbit = new THREE.Line(jupiterOrbitGeometry, jupiterOrbitMaterial);
+jupiterOrbit.rotateX(toRadians(jupiter.orbitalTilt))
+jupiter.elipse = jupiterCurve;
+jupiter.orbitLine = jupiterOrbit;
+scene.add(jupiterOrbit)
 
+//saturn
+let saturnGroup = new THREE.Group()
+const saturnCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 0, //center of the elipse x,y
+  saturn.orbitSize, saturn.orbitSize, //x then y radius
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const saturnPoints = saturnCurve.getPoints(1000);
+const saturnOrbitGeometry = new THREE.BufferGeometry().setFromPoints(saturnPoints);
+const saturnOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const saturnOrbit = new THREE.Line(saturnOrbitGeometry, saturnOrbitMaterial);
+saturnOrbit.rotateX(toRadians(saturn.orbitalTilt))
+saturn.elipse = saturnCurve;
+saturn.orbitLine = saturnOrbit;
+scene.add(saturnOrbit)
 
+//uranus
+let uranusGroup = new THREE.Group()
+const uranusCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 0, //center of the elipse x,y
+  uranus.orbitSize, uranus.orbitSize, //x then y radiuneptunes
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const uranusPoints = uranusCurve.getPoints(1000);
+const uranusOrbitGeometry = new THREE.BufferGeometry().setFromPoints(uranusPoints);
+const uranusOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const uranusOrbit = new THREE.Line(uranusOrbitGeometry, uranusOrbitMaterial);
+uranusOrbit.rotateX(toRadians(uranus.orbitalTilt))
+uranus.elipse = uranusCurve;
+uranus.orbitLine = uranusOrbit;
+scene.add(uranusOrbit)
+
+//neptune
+let neptuneGroup = new THREE.Group()
+const neptuneCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 0, //center of the elipse x,y
+  neptune.orbitSize, neptune.orbitSize, //x then y radius
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const neptunePoints = neptuneCurve.getPoints(1000);
+const neptuneOrbitGeometry = new THREE.BufferGeometry().setFromPoints(neptunePoints);
+const neptuneOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const neptuneOrbit = new THREE.Line(neptuneOrbitGeometry, neptuneOrbitMaterial);
+neptuneOrbit.rotateX(toRadians(neptune.orbitalTilt))
+neptune.elipse = neptuneCurve;
+neptune.orbitLine = neptuneOrbit;
+scene.add(neptuneOrbit)
+
+//pluto
+let plutoGroup = new THREE.Group()
+const plutoCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 0, //center of the elipse x,y
+  pluto.orbitSize, pluto.orbitSize, //x then y radius
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const plutoPoints = plutoCurve.getPoints(1000);
+const plutoOrbitGeometry = new THREE.BufferGeometry().setFromPoints(plutoPoints);
+const plutoOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const plutoOrbit = new THREE.Line(plutoOrbitGeometry, plutoOrbitMaterial);
+plutoOrbit.rotateX(toRadians(pluto.orbitalTilt))
+pluto.elipse = plutoCurve;
+pluto.orbitLine = plutoOrbit;
+scene.add(plutoOrbit)
 
 
 //---------------------------------------------------------------------
@@ -191,11 +333,117 @@ earthGroup.add(earthSphere);
 earth.planetGroup = earthGroup;
 scene.add(earthGroup)
 
+//mercury
+const mercuryTexture = textureLoader.load('statics/images/mercuryTexture.jpg')
+const mercuryGeometry = new THREE.SphereGeometry(mercury.size);
+const mercuryMaterial = new THREE.MeshPhongMaterial({
+  map: mercuryTexture,
+  shininess: 0.3,
+});
+const mercurySphere = new THREE.Mesh( mercuryGeometry, mercuryMaterial );
+mercurySphere.rotation.z += toRadians(mercury.axialTilt);
+mercurySphere.position.set(0,0,0);
+mercuryGroup.add(mercurySphere);
+mercury.planetGroup = mercuryGroup;
+scene.add(mercuryGroup)
 
+//venus
+const venusTexture = textureLoader.load('statics/images/venusTexture.jpg')
+const venusGeometry = new THREE.SphereGeometry(venus.size);
+const venusMaterial = new THREE.MeshPhongMaterial({
+  map: venusTexture,
+  shininess: 0.3,
+});
+const venusSphere = new THREE.Mesh( venusGeometry, venusMaterial );
+venusSphere.rotation.z += toRadians(venus.axialTilt);
+venusSphere.position.set(0,0,0);
+venusGroup.add(venusSphere);
+venus.planetGroup = venusGroup;
+scene.add(venusGroup)
 
+//mars
+const marsTexture = textureLoader.load('statics/images/marsTexture.jpg')
+const marsGeometry = new THREE.SphereGeometry(mars.size);
+const marsMaterial = new THREE.MeshPhongMaterial({
+  map: marsTexture,
+  shininess: 0.3,
+});
+const marsSphere = new THREE.Mesh( marsGeometry, marsMaterial );
+marsSphere.rotation.z += toRadians(mars.axialTilt);
+marsSphere.position.set(0,0,0);
+marsGroup.add(marsSphere);
+mars.planetGroup = marsGroup;
+scene.add(marsGroup)
 
+//jupiter
+const jupiterTexture = textureLoader.load('statics/images/jupiterTexture.jpg')
+const jupiterGeometry = new THREE.SphereGeometry(jupiter.size);
+const jupiterMaterial = new THREE.MeshPhongMaterial({
+  map: jupiterTexture,
+  shininess: 0.3,
+});
+const jupiterSphere = new THREE.Mesh( jupiterGeometry, jupiterMaterial );
+jupiterSphere.rotation.z += toRadians(jupiter.axialTilt);
+jupiterSphere.position.set(0,0,0);
+jupiterGroup.add(jupiterSphere);
+jupiter.planetGroup = jupiterGroup;
+scene.add(jupiterGroup)
 
+//saturn
+const saturnTexture = textureLoader.load('statics/images/saturnTexture.jpg')
+const saturnGeometry = new THREE.SphereGeometry(saturn.size);
+const saturnMaterial = new THREE.MeshPhongMaterial({
+  map: saturnTexture,
+  shininess: 0.3,
+});
+const saturnSphere = new THREE.Mesh( saturnGeometry, saturnMaterial );
+saturnSphere.rotation.z += toRadians(saturn.axialTilt);
+saturnSphere.position.set(0,0,0);
+saturnGroup.add(saturnSphere);
+saturn.planetGroup = saturnGroup;
+scene.add(saturnGroup)
 
+//uranus
+const uranusTexture = textureLoader.load('statics/images/uranusTexture.jpg')
+const uranusGeometry = new THREE.SphereGeometry(uranus.size);
+const uranusMaterial = new THREE.MeshPhongMaterial({
+  map: uranusTexture,
+  shininess: 0.3,
+});
+const uranusSphere = new THREE.Mesh( uranusGeometry, uranusMaterial );
+uranusSphere.rotation.z += toRadians(uranus.axialTilt);
+uranusSphere.position.set(0,0,0);
+uranusGroup.add(uranusSphere);
+uranus.planetGroup = uranusGroup;
+scene.add(uranusGroup)
+
+//neptune
+const neptuneTexture = textureLoader.load('statics/images/neptuneTexture.jpg')
+const neptuneGeometry = new THREE.SphereGeometry(neptune.size);
+const neptuneMaterial = new THREE.MeshPhongMaterial({
+  map: neptuneTexture,
+  shininess: 0.3,
+});
+const neptuneSphere = new THREE.Mesh( neptuneGeometry, neptuneMaterial );
+neptuneSphere.rotation.z += toRadians(neptune.axialTilt);
+neptuneSphere.position.set(0,0,0);
+neptuneGroup.add(neptuneSphere);
+neptune.planetGroup = neptuneGroup;
+scene.add(neptuneGroup)
+
+//pluto
+const plutoTexture = textureLoader.load('statics/images/plutoTexture.jpg')
+const plutoGeometry = new THREE.SphereGeometry(pluto.size);
+const plutoMaterial = new THREE.MeshPhongMaterial({
+  map: plutoTexture,
+  shininess: 0.3,
+});
+const plutoSphere = new THREE.Mesh( plutoGeometry, plutoMaterial );
+plutoSphere.rotation.z += toRadians(pluto.axialTilt);
+plutoSphere.position.set(0,0,0);
+plutoGroup.add(plutoSphere);
+pluto.planetGroup = plutoGroup;
+scene.add(plutoGroup)
 
 
 
@@ -208,10 +456,26 @@ sunLight.power = 2000;
 
 earthSphere.castShadow = true;
 earthSphere.receiveShadow = true;
+mercurySphere.castShadow = true;
+mercurySphere.receiveShadow = true;
+venusSphere.castShadow = true;
+venusSphere.receiveShadow = true;
+marsSphere.castShadow = true;
+marsSphere.receiveShadow = true;
+jupiterSphere.castShadow = true;
+jupiterSphere.receiveShadow = true;
+saturnSphere.castShadow = true;
+saturnSphere.receiveShadow = true;
+uranusSphere.castShadow = true;
+uranusSphere.receiveShadow = true;
+neptuneSphere.castShadow = true;
+neptuneSphere.receiveShadow = true;
+plutoSphere.castShadow = true;
+plutoSphere.receiveShadow = true;
 
 
 // configuring camera to be in a reasonable location
-camera.position.set(-3.0 * sun.size, 3.0 * sun.size, 3.0 * sun.size);
+camera.position.set(-3.0 * earth.orbitSize, 3.0 * earth.orbitSize, 3.0 * earth.orbitSize);
 CameraControls.target.set(0, 0, 0);
 CameraControls.update();
 
@@ -230,13 +494,30 @@ function animate( time ) {
   
   sunSphere.rotation.y = (time / divisor) * sun.rotationSpeed;
   earthSphere.rotation.y = (time / divisor) * earth.rotationSpeed;
-
+  mercurySphere.rotation.y = (time / divisor) * mercury.rotationSpeed;
+  venusSphere.rotation.y = -(time / divisor) * venus.rotationSpeed;
+  marsSphere.rotation.y = (time / divisor) * mars.rotationSpeed;
+  jupiterSphere.rotation.y = (time / divisor) * jupiter.rotationSpeed;
+  saturnSphere.rotation.y = (time / divisor) * saturn.rotationSpeed;
+  uranusSphere.rotation.y = (time / divisor) * uranus.rotationSpeed;
+  neptuneSphere.rotation.y = (time / divisor) * neptune.rotationSpeed;
+  plutoSphere.rotation.y = (time / divisor) * pluto.rotationSpeed;
 //---------------------------------------------------------------------
 // Planet Orbital Rotation Update
 // ---------------------------------------------------------------------
 
   updatePlanetRotation(earth, time);
-  
+  updatePlanetRotation(mercury, time);
+  updatePlanetRotation(venus, time);
+  updatePlanetRotation(mars, time);
+  updatePlanetRotation(jupiter, time);
+  updatePlanetRotation(saturn, time);
+  updatePlanetRotation(uranus, time);
+  updatePlanetRotation(neptune, time);
+  updatePlanetRotation(pluto, time);
+
+
+
   updateCameraMovement(deltaSeconds);
   
 
