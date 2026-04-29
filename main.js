@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { toRadians } from './js/helper'
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.01, 1000 );
+const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.01, 1000000 );
 
 
 const renderer = new THREE.WebGLRenderer();
@@ -18,15 +18,31 @@ const CameraControls = new OrbitControls(camera, renderer.domElement);
 CameraControls.minDistance = 0;
 CameraControls.maxDistance = 3000;
 CameraControls.zoomToCursor = true;
+const cameraMoveSpeed = 800;
+
+//This adds som ambient light so planets are visiable even from the dark side
+let ambientLight = new THREE.AmbientLight(0x404040);
+
+scene.add(ambientLight);
 
 const pressedKeys = new Set();
-const cameraMoveSpeed = 100;
 const cameraMoveDirection = new THREE.Vector3();
 const cameraForward = new THREE.Vector3();
 const cameraRight = new THREE.Vector3();
 const orbitPoint = new THREE.Vector3();
+const pointer = new THREE.Vector2();
+const raycaster = new THREE.Raycaster();
+const hoverObjects = [];
+const highlightColor = new THREE.Color(0x66ccff);
 let previousFrameTime = 0;
+let pointerIsOverCanvas = false;
+let hoveredPlanet = null;
 
+raycaster.params.Line.threshold = 1.0;
+
+//---------------------------------------------------------------------
+// Event Listeners
+// ---------------------------------------------------------------------
 window.addEventListener('keydown', (event) => {
   pressedKeys.add(event.code);
 });
@@ -35,13 +51,24 @@ window.addEventListener('keyup', (event) => {
   pressedKeys.delete(event.code);
 });
 
-let ambientLight = new THREE.AmbientLight(0x404040);
+renderer.domElement.addEventListener('pointermove', (event) => {
+  const rect = renderer.domElement.getBoundingClientRect();
 
-scene.add(ambientLight);
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  pointerIsOverCanvas = true;
+});
+
+renderer.domElement.addEventListener('pointerleave', () => {
+  pointerIsOverCanvas = false;
+});
+
 
 //---------------------------------------------------------------------
 // local functions
 // ---------------------------------------------------------------------
+//generic function that takes in planet and current time and then calculates the current position
+// of the planet and sets it accordingly
 function updatePlanetRotation(planet, time = performance.now()) {
   const seconds = time / 1000;
   const orbitProgress = (seconds / planet.orbitalSpeed) % earth.orbitalSpeed;
@@ -54,6 +81,7 @@ function updatePlanetRotation(planet, time = performance.now()) {
   planet.planetGroup.position.copy(orbitPoint);
 }
 
+// adds/subs camera looking direction to the current camera direction to get new pos to make it look like you are flying
 function updateCameraMovement(deltaSeconds) {
   cameraMoveDirection.set(0, 0, 0);
 
@@ -81,6 +109,47 @@ function updateCameraMovement(deltaSeconds) {
   camera.position.add(cameraMoveDirection);
   CameraControls.target.add(cameraMoveDirection);
   CameraControls.update();
+}
+
+function addHoverTarget(object, planet) {
+  object.userData.planet = planet;
+  hoverObjects.push(object);
+}
+
+function setPlanetHighlight(planet, isHighlighted) {
+  if (!planet) {
+    return;
+  }
+
+  planet.orbitLine.material.color.set(isHighlighted ? highlightColor : 0xffffff);
+  planet.orbitLine.material.opacity = isHighlighted ? 1 : 0.8;
+
+  if (planet.planetMesh.material.emissive) {
+    planet.planetMesh.material.emissive.set(isHighlighted ? highlightColor : 0x000000);
+    planet.planetMesh.material.emissiveIntensity = isHighlighted ? 0.45 : 0;
+  }
+}
+
+function updateHoverHighlight() {
+  if (!pointerIsOverCanvas) {
+    setPlanetHighlight(hoveredPlanet, false);
+    hoveredPlanet = null;
+    return;
+  }
+
+  scene.updateMatrixWorld(true);
+  raycaster.setFromCamera(pointer, camera);
+
+  const hits = raycaster.intersectObjects(hoverObjects, false);
+  const nextHoveredPlanet = hits.length > 0 ? hits[0].object.userData.planet : null;
+
+  if (nextHoveredPlanet === hoveredPlanet) {
+    return;
+  }
+
+  setPlanetHighlight(hoveredPlanet, false);
+  hoveredPlanet = nextHoveredPlanet;
+  setPlanetHighlight(hoveredPlanet, true);
 }
 
 
@@ -126,7 +195,7 @@ class Planet {
 }
 
 // find the info used to calculate these numbers here: https://science.nasa.gov/solar-system/planets/planet-sizes-and-locations-in-our-solar-system/
-let earth = new Planet(0.5, 365.0, 10.0, 23.5, 10.0, -90.0);
+let earth = new Planet(1.0, 1.0, 100.0, 23.5, 500.0, -90.0);
 let jupiter = new Planet(earth.size * 11.2, earth.rotationSpeed * 2.42, earth.orbitalSpeed * 12.0, 3.0, earth.orbitSize * 5.2, earth.orbitalTilt + 1.31);
 let saturn = new Planet(earth.size * 9.45, earth.rotationSpeed * 2.24, earth.orbitalSpeed * 29.4, 26.37, earth.orbitSize * 9.5, earth.orbitalTilt + 2.49);
 let uranus = new Planet(earth.size * 4.0, earth.rotationSpeed * 0.71, earth.orbitalSpeed * 84, 97.77, earth.orbitSize * 19.2, earth.orbitalTilt + 0.77);
@@ -135,7 +204,7 @@ let venus = new Planet(earth.size * 0.95, earth.rotationSpeed * 0.004, earth.orb
 let mars = new Planet(earth.size * 0.53, earth.rotationSpeed * 1.025, earth.orbitalSpeed * 1.88, 25.0, earth.orbitSize * 1.52, earth.orbitalTilt + 1.85);
 let mercury = new Planet(earth.size * 0.38, earth.rotationSpeed * 59.0, earth.orbitalSpeed * 0.241, 2.0, earth.orbitSize * 0.39, earth.orbitalTilt + 7.01);
 let pluto = new Planet(earth.size * 0.19, earth.rotationSpeed * 6.38, earth.orbitalSpeed * 248.0, 57.0, earth.orbitSize * 39.5, earth.orbitalTilt + 17.14);
-let sun = new Planet(earth.size * 2.0, earth.rotationSpeed * 36.0, 0.0, 0);
+let sun = new Planet(earth.size * 100.0, earth.rotationSpeed * 36.0, 0.0, 0);
 const planetArray = [earth, jupiter, saturn, uranus, neptune, venus, mars, mercury, pluto]
 
 //---------------------------------------------------------------------
@@ -157,6 +226,7 @@ earthOrbit.rotateX(toRadians(earth.orbitalTilt))
 earth.elipse = earthCurve;
 earth.orbitLine = earthOrbit;
 scene.add(earthOrbit)
+addHoverTarget(earthOrbit, earth);
 
 //mercury
 let mercuryGroup = new THREE.Group()
@@ -175,6 +245,7 @@ mercuryOrbit.rotateX(toRadians(mercury.orbitalTilt))
 mercury.elipse = mercuryCurve;
 mercury.orbitLine = mercuryOrbit;
 scene.add(mercuryOrbit)
+addHoverTarget(mercuryOrbit, mercury);
 
 //venus
 let venusGroup = new THREE.Group()
@@ -193,6 +264,7 @@ venusOrbit.rotateX(toRadians(venus.orbitalTilt))
 venus.elipse = venusCurve;
 venus.orbitLine = venusOrbit;
 scene.add(venusOrbit)
+addHoverTarget(venusOrbit, venus);
 
 //mars
 let marsGroup = new THREE.Group()
@@ -211,6 +283,7 @@ marsOrbit.rotateX(toRadians(mars.orbitalTilt))
 mars.elipse = marsCurve;
 mars.orbitLine = marsOrbit;
 scene.add(marsOrbit)
+addHoverTarget(marsOrbit, mars);
 
 //jupiter
 let jupiterGroup = new THREE.Group()
@@ -229,6 +302,7 @@ jupiterOrbit.rotateX(toRadians(jupiter.orbitalTilt))
 jupiter.elipse = jupiterCurve;
 jupiter.orbitLine = jupiterOrbit;
 scene.add(jupiterOrbit)
+addHoverTarget(jupiterOrbit, jupiter);
 
 //saturn
 let saturnGroup = new THREE.Group()
@@ -247,6 +321,7 @@ saturnOrbit.rotateX(toRadians(saturn.orbitalTilt))
 saturn.elipse = saturnCurve;
 saturn.orbitLine = saturnOrbit;
 scene.add(saturnOrbit)
+addHoverTarget(saturnOrbit, saturn);
 
 //uranus
 let uranusGroup = new THREE.Group()
@@ -265,6 +340,7 @@ uranusOrbit.rotateX(toRadians(uranus.orbitalTilt))
 uranus.elipse = uranusCurve;
 uranus.orbitLine = uranusOrbit;
 scene.add(uranusOrbit)
+addHoverTarget(uranusOrbit, uranus);
 
 //neptune
 let neptuneGroup = new THREE.Group()
@@ -283,6 +359,7 @@ neptuneOrbit.rotateX(toRadians(neptune.orbitalTilt))
 neptune.elipse = neptuneCurve;
 neptune.orbitLine = neptuneOrbit;
 scene.add(neptuneOrbit)
+addHoverTarget(neptuneOrbit, neptune);
 
 //pluto
 let plutoGroup = new THREE.Group()
@@ -301,6 +378,7 @@ plutoOrbit.rotateX(toRadians(pluto.orbitalTilt))
 pluto.elipse = plutoCurve;
 pluto.orbitLine = plutoOrbit;
 scene.add(plutoOrbit)
+addHoverTarget(plutoOrbit, pluto);
 
 
 //---------------------------------------------------------------------
@@ -314,7 +392,7 @@ const sunSphere = new THREE.Mesh( sunGeometry, sunMaterial );
 sunSphere.position.set(0,0,0)
 scene.add( sunSphere );
 
-const sunLight = new THREE.PointLight(0xffffff, 1, 0, 0.90 );
+const sunLight = new THREE.PointLight(0xffffff, 1, 0, 0.999999999 );
 sunSphere.add(sunLight);
 sunSphere.rotation.z += toRadians(sun.axialTilt);
 
@@ -331,7 +409,9 @@ earthSphere.rotation.z += toRadians(earth.axialTilt);
 earthSphere.position.set(0,0,0);
 earthGroup.add(earthSphere);
 earth.planetGroup = earthGroup;
+earth.planetMesh = earthSphere;
 scene.add(earthGroup)
+addHoverTarget(earthSphere, earth);
 
 //mercury
 const mercuryTexture = textureLoader.load('statics/images/mercuryTexture.jpg')
@@ -345,7 +425,9 @@ mercurySphere.rotation.z += toRadians(mercury.axialTilt);
 mercurySphere.position.set(0,0,0);
 mercuryGroup.add(mercurySphere);
 mercury.planetGroup = mercuryGroup;
+mercury.planetMesh = mercurySphere;
 scene.add(mercuryGroup)
+addHoverTarget(mercurySphere, mercury);
 
 //venus
 const venusTexture = textureLoader.load('statics/images/venusTexture.jpg')
@@ -359,7 +441,9 @@ venusSphere.rotation.z += toRadians(venus.axialTilt);
 venusSphere.position.set(0,0,0);
 venusGroup.add(venusSphere);
 venus.planetGroup = venusGroup;
+venus.planetMesh = venusSphere;
 scene.add(venusGroup)
+addHoverTarget(venusSphere, venus);
 
 //mars
 const marsTexture = textureLoader.load('statics/images/marsTexture.jpg')
@@ -373,7 +457,9 @@ marsSphere.rotation.z += toRadians(mars.axialTilt);
 marsSphere.position.set(0,0,0);
 marsGroup.add(marsSphere);
 mars.planetGroup = marsGroup;
+mars.planetMesh = marsSphere;
 scene.add(marsGroup)
+addHoverTarget(marsSphere, mars);
 
 //jupiter
 const jupiterTexture = textureLoader.load('statics/images/jupiterTexture.jpg')
@@ -387,7 +473,9 @@ jupiterSphere.rotation.z += toRadians(jupiter.axialTilt);
 jupiterSphere.position.set(0,0,0);
 jupiterGroup.add(jupiterSphere);
 jupiter.planetGroup = jupiterGroup;
+jupiter.planetMesh = jupiterSphere;
 scene.add(jupiterGroup)
+addHoverTarget(jupiterSphere, jupiter);
 
 //saturn
 const saturnTexture = textureLoader.load('statics/images/saturnTexture.jpg')
@@ -401,7 +489,9 @@ saturnSphere.rotation.z += toRadians(saturn.axialTilt);
 saturnSphere.position.set(0,0,0);
 saturnGroup.add(saturnSphere);
 saturn.planetGroup = saturnGroup;
+saturn.planetMesh = saturnSphere;
 scene.add(saturnGroup)
+addHoverTarget(saturnSphere, saturn);
 
 //uranus
 const uranusTexture = textureLoader.load('statics/images/uranusTexture.jpg')
@@ -415,7 +505,9 @@ uranusSphere.rotation.z += toRadians(uranus.axialTilt);
 uranusSphere.position.set(0,0,0);
 uranusGroup.add(uranusSphere);
 uranus.planetGroup = uranusGroup;
+uranus.planetMesh = uranusSphere;
 scene.add(uranusGroup)
+addHoverTarget(uranusSphere, uranus);
 
 //neptune
 const neptuneTexture = textureLoader.load('statics/images/neptuneTexture.jpg')
@@ -429,7 +521,9 @@ neptuneSphere.rotation.z += toRadians(neptune.axialTilt);
 neptuneSphere.position.set(0,0,0);
 neptuneGroup.add(neptuneSphere);
 neptune.planetGroup = neptuneGroup;
+neptune.planetMesh = neptuneSphere;
 scene.add(neptuneGroup)
+addHoverTarget(neptuneSphere, neptune);
 
 //pluto
 const plutoTexture = textureLoader.load('statics/images/plutoTexture.jpg')
@@ -443,7 +537,9 @@ plutoSphere.rotation.z += toRadians(pluto.axialTilt);
 plutoSphere.position.set(0,0,0);
 plutoGroup.add(plutoSphere);
 pluto.planetGroup = plutoGroup;
+pluto.planetMesh = plutoSphere;
 scene.add(plutoGroup)
+addHoverTarget(plutoSphere, pluto);
 
 
 
@@ -519,6 +615,7 @@ function animate( time ) {
 
 
   updateCameraMovement(deltaSeconds);
+  updateHoverHighlight();
   
 
 
