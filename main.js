@@ -24,6 +24,7 @@ const cameraMoveSpeed = 40;
 const cameraMoveDirection = new THREE.Vector3();
 const cameraForward = new THREE.Vector3();
 const cameraRight = new THREE.Vector3();
+const orbitPoint = new THREE.Vector3();
 let previousFrameTime = 0;
 
 window.addEventListener('keydown', (event) => {
@@ -43,13 +44,14 @@ scene.add(ambientLight);
 // ---------------------------------------------------------------------
 function updatePlanetRotation(planet, time = performance.now()) {
   const seconds = time / 1000;
-  const orbitProgress = (seconds / planet.orbitalSpeed) % earth.orbitalSpeed;
+  const orbitProgress = (seconds / planet.orbitalSpeed) % 1;
 
   const p = planet.elipse.getPoint(orbitProgress);
-  
+  orbitPoint.set(p.x, p.y, 0);
+  planet.orbitLine.updateWorldMatrix(true, false);
+  planet.orbitLine.localToWorld(orbitPoint);
 
-  planet.planetGroup.position.x = p.x;
-  planet.planetGroup.position.z = p.y;
+  planet.planetGroup.position.copy(orbitPoint);
 }
 
 function updateCameraMovement(deltaSeconds) {
@@ -108,7 +110,7 @@ scene.background = skyboxCubemap;
 // ---------------------------------------------------------------------
 // setting up blueprint for planets
 class Planet {
-    constructor(size, rotationSpeed, orbitalSpeed, axialTilt, orbitSize, elipse, planetGroup) {
+    constructor(size, rotationSpeed, orbitalSpeed, axialTilt, orbitSize, orbitalTilt, orbitLine, planetGroup) {
         //these are calculated using meteres as a ratio
         this.size = size
         this.rotationSpeed = rotationSpeed
@@ -116,22 +118,23 @@ class Planet {
         this.axialTilt = axialTilt
         // This is calculated using AU
         this.orbitSize = orbitSize
+        this.orbitalTilt = orbitalTilt
         //this is the points from the orbit calculated above
-        this.elipse = elipse
+        this.orbitLine = orbitLine
         this.planetGroup = planetGroup
     }
 }
 
 // find the info used to calculate these numbers here: https://science.nasa.gov/solar-system/planets/planet-sizes-and-locations-in-our-solar-system/
-let earth = new Planet(1.0, 0.05, 1000.0, 23.5, 100);
-let jupiter = new Planet(earth.size * 11.2, earth.rotationSpeed * 0.41, earth.orbitalSpeed * 11.8, 3.0);
-let saturn = new Planet(earth.size * 9.45, earth.rotationSpeed * 0.45, earth.orbitalSpeed * 11.8, 26.37);
-let uranus = new Planet(earth.size * 4.0, earth.rotationSpeed * 0.71, earth.orbitalSpeed * 84, 97.77);
-let neptune = new Planet(earth.size * 3.88, earth.rotationSpeed * 0.67, earth.orbitalSpeed * 165.0, 28.0);
-let venus = new Planet(earth.size * 0.95, earth.rotationSpeed * 243.0, earth.orbitalSpeed * 225.0, 3.0);
-let mars = new Planet(earth.size * 0.53, earth.rotationSpeed * 1.025, earth.orbitalSpeed * 687.0, 25.0);
-let mercury = new Planet(earth.size * 0.38, earth.rotationSpeed * 59.0, earth.orbitalSpeed * 0.241, 2.0);
-let pluto = new Planet(earth.size * 0.19, earth.rotationSpeed * 6.38, earth.orbitalSpeed * 248.0, 57.0);
+let earth = new Planet(1.0, 0.05, 1000.0, 23.5, 50.0, -90.0);
+let jupiter = new Planet(earth.size * 11.2, earth.rotationSpeed * 0.41, earth.orbitalSpeed * 11.8, 3.0, earth.orbitSize * 5.2, earth.orbitalTilt + 1.31);
+let saturn = new Planet(earth.size * 9.45, earth.rotationSpeed * 0.45, earth.orbitalSpeed * 11.8, 26.37, earth.orbitSize * 9.5, earth.orbitalTilt + 2.49);
+let uranus = new Planet(earth.size * 4.0, earth.rotationSpeed * 0.71, earth.orbitalSpeed * 84, 97.77, earth.orbitSize * 19.2, earth.orbitalTilt + 0.77);
+let neptune = new Planet(earth.size * 3.88, earth.rotationSpeed * 0.67, earth.orbitalSpeed * 165.0, 28.0, earth.orbitSize * 30.1, earth.orbitalTilt + 1.77);
+let venus = new Planet(earth.size * 0.95, earth.rotationSpeed * 243.0, earth.orbitalSpeed * 225.0, 3.0, earth.orbitSize * 0.72, earth.orbitalTilt + 3.39);
+let mars = new Planet(earth.size * 0.53, earth.rotationSpeed * 1.025, earth.orbitalSpeed * 687.0, 25.0, earth.orbitSize * 1.52, earth.orbitalTilt + 1.85);
+let mercury = new Planet(earth.size * 0.38, earth.rotationSpeed * 59.0, earth.orbitalSpeed * 0.241, 2.0, earth.orbitSize * 0.39, earth.orbitalTilt + 7.01);
+let pluto = new Planet(earth.size * 0.19, earth.rotationSpeed * 6.38, earth.orbitalSpeed * 248.0, 57.0, earth.orbitSize * 39.5, earth.orbitalTilt + 17.14);
 let sun = new Planet(earth.size * 2.0, earth.rotationSpeed * 36.0, 0.0, 0);
 const planetArray = [earth, jupiter, saturn, uranus, neptune, venus, mars, mercury, pluto]
 
@@ -150,9 +153,28 @@ const earthPoints = earthCurve.getPoints(1000);
 const earthOrbitGeometry = new THREE.BufferGeometry().setFromPoints(earthPoints);
 const earthOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
 const earthOrbit = new THREE.Line(earthOrbitGeometry, earthOrbitMaterial);
-earthOrbit.rotateX(toRadians(-90))
+earthOrbit.rotateX(toRadians(earth.orbitalTilt))
 earth.elipse = earthCurve;
+earth.orbitLine = earthOrbit;
 scene.add(earthOrbit)
+
+//mercury
+let mercuryGroup = new THREE.Group()
+const mercuryCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 5, //center of the elipse x,y
+  mercury.orbitSize, mercury.orbitSize, //x then y radius
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const mercuryPoints = mercuryCurve.getPoints(1000);
+const mercuryOrbitGeometry = new THREE.BufferGeometry().setFromPoints(mercuryPoints);
+const mercuryOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const mercuryOrbit = new THREE.Line(mercuryOrbitGeometry, mercuryOrbitMaterial);
+mercuryOrbit.rotateX(toRadians(mercury.orbitalTilt))
+mercury.elipse = mercuryCurve;
+mercury.orbitLine = mercuryOrbit;
+scene.add(mercuryOrbit)
 
 
 
@@ -191,6 +213,20 @@ earthGroup.add(earthSphere);
 earth.planetGroup = earthGroup;
 scene.add(earthGroup)
 
+//mercury
+const mercuryTexture = textureLoader.load('statics/images/mercuryTexture.jpg')
+const mercuryGeometry = new THREE.SphereGeometry(mercury.size);
+const mercuryMaterial = new THREE.MeshPhongMaterial({
+  map: mercuryTexture,
+  shininess: 0.3,
+});
+const mercurySphere = new THREE.Mesh( mercuryGeometry, mercuryMaterial );
+mercurySphere.rotation.z += toRadians(mercury.axialTilt);
+mercurySphere.position.set(0,0,0);
+mercuryGroup.add(mercurySphere);
+mercury.planetGroup = mercuryGroup;
+scene.add(mercuryGroup)
+
 
 
 
@@ -208,10 +244,11 @@ sunLight.power = 2000;
 
 earthSphere.castShadow = true;
 earthSphere.receiveShadow = true;
-
+mercurySphere.castShadow = true;
+mercurySphere.receiveShadow = true;
 
 // configuring camera to be in a reasonable location
-camera.position.set(-3.0 * sun.size, 3.0 * sun.size, 3.0 * sun.size);
+camera.position.set(-3.0 * earth.orbitSize, 3.0 * earth.orbitSize, 3.0 * earth.orbitSize);
 CameraControls.target.set(0, 0, 0);
 CameraControls.update();
 
@@ -230,13 +267,19 @@ function animate( time ) {
   
   sunSphere.rotation.y = (time / divisor) * sun.rotationSpeed;
   earthSphere.rotation.y = (time / divisor) * earth.rotationSpeed;
+  mercurySphere.rotation.y = (time / divisor) * mercury.rotationSpeed;
+  
 
 //---------------------------------------------------------------------
 // Planet Orbital Rotation Update
 // ---------------------------------------------------------------------
 
   updatePlanetRotation(earth, time);
+  updatePlanetRotation(mercury, time);
   
+
+
+
   updateCameraMovement(deltaSeconds);
   
 
