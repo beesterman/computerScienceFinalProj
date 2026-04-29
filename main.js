@@ -20,7 +20,7 @@ CameraControls.maxDistance = 3000;
 CameraControls.zoomToCursor = true;
 
 const pressedKeys = new Set();
-const cameraMoveSpeed = 40;
+const cameraMoveSpeed = 100;
 const cameraMoveDirection = new THREE.Vector3();
 const cameraForward = new THREE.Vector3();
 const cameraRight = new THREE.Vector3();
@@ -248,7 +248,59 @@ saturn.elipse = saturnCurve;
 saturn.orbitLine = saturnOrbit;
 scene.add(saturnOrbit)
 
+//uranus
+let uranusGroup = new THREE.Group()
+const uranusCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 0, //center of the elipse x,y
+  uranus.orbitSize, uranus.orbitSize, //x then y radiuneptunes
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const uranusPoints = uranusCurve.getPoints(1000);
+const uranusOrbitGeometry = new THREE.BufferGeometry().setFromPoints(uranusPoints);
+const uranusOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const uranusOrbit = new THREE.Line(uranusOrbitGeometry, uranusOrbitMaterial);
+uranusOrbit.rotateX(toRadians(uranus.orbitalTilt))
+uranus.elipse = uranusCurve;
+uranus.orbitLine = uranusOrbit;
+scene.add(uranusOrbit)
 
+//neptune
+let neptuneGroup = new THREE.Group()
+const neptuneCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 0, //center of the elipse x,y
+  neptune.orbitSize, neptune.orbitSize, //x then y radius
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const neptunePoints = neptuneCurve.getPoints(1000);
+const neptuneOrbitGeometry = new THREE.BufferGeometry().setFromPoints(neptunePoints);
+const neptuneOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const neptuneOrbit = new THREE.Line(neptuneOrbitGeometry, neptuneOrbitMaterial);
+neptuneOrbit.rotateX(toRadians(neptune.orbitalTilt))
+neptune.elipse = neptuneCurve;
+neptune.orbitLine = neptuneOrbit;
+scene.add(neptuneOrbit)
+
+//pluto
+let plutoGroup = new THREE.Group()
+const plutoCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 0, //center of the elipse x,y
+  pluto.orbitSize, pluto.orbitSize, //x then y radius
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const plutoPoints = plutoCurve.getPoints(1000);
+const plutoOrbitGeometry = new THREE.BufferGeometry().setFromPoints(plutoPoints);
+const plutoOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const plutoOrbit = new THREE.Line(plutoOrbitGeometry, plutoOrbitMaterial);
+plutoOrbit.rotateX(toRadians(pluto.orbitalTilt))
+pluto.elipse = plutoCurve;
+pluto.orbitLine = plutoOrbit;
+scene.add(plutoOrbit)
 
 
 //---------------------------------------------------------------------
@@ -351,7 +403,47 @@ saturnGroup.add(saturnSphere);
 saturn.planetGroup = saturnGroup;
 scene.add(saturnGroup)
 
+//uranus
+const uranusTexture = textureLoader.load('statics/images/uranusTexture.jpg')
+const uranusGeometry = new THREE.SphereGeometry(uranus.size);
+const uranusMaterial = new THREE.MeshPhongMaterial({
+  map: uranusTexture,
+  shininess: 0.3,
+});
+const uranusSphere = new THREE.Mesh( uranusGeometry, uranusMaterial );
+uranusSphere.rotation.z += toRadians(uranus.axialTilt);
+uranusSphere.position.set(0,0,0);
+uranusGroup.add(uranusSphere);
+uranus.planetGroup = uranusGroup;
+scene.add(uranusGroup)
 
+//neptune
+const neptuneTexture = textureLoader.load('statics/images/neptuneTexture.jpg')
+const neptuneGeometry = new THREE.SphereGeometry(neptune.size);
+const neptuneMaterial = new THREE.MeshPhongMaterial({
+  map: neptuneTexture,
+  shininess: 0.3,
+});
+const neptuneSphere = new THREE.Mesh( neptuneGeometry, neptuneMaterial );
+neptuneSphere.rotation.z += toRadians(neptune.axialTilt);
+neptuneSphere.position.set(0,0,0);
+neptuneGroup.add(neptuneSphere);
+neptune.planetGroup = neptuneGroup;
+scene.add(neptuneGroup)
+
+//pluto
+const plutoTexture = textureLoader.load('statics/images/plutoTexture.jpg')
+const plutoGeometry = new THREE.SphereGeometry(pluto.size);
+const plutoMaterial = new THREE.MeshPhongMaterial({
+  map: plutoTexture,
+  shininess: 0.3,
+});
+const plutoSphere = new THREE.Mesh( plutoGeometry, plutoMaterial );
+plutoSphere.rotation.z += toRadians(pluto.axialTilt);
+plutoSphere.position.set(0,0,0);
+plutoGroup.add(plutoSphere);
+pluto.planetGroup = plutoGroup;
+scene.add(plutoGroup)
 
 
 
@@ -374,6 +466,13 @@ jupiterSphere.castShadow = true;
 jupiterSphere.receiveShadow = true;
 saturnSphere.castShadow = true;
 saturnSphere.receiveShadow = true;
+uranusSphere.castShadow = true;
+uranusSphere.receiveShadow = true;
+neptuneSphere.castShadow = true;
+neptuneSphere.receiveShadow = true;
+plutoSphere.castShadow = true;
+plutoSphere.receiveShadow = true;
+
 
 // configuring camera to be in a reasonable location
 camera.position.set(-3.0 * earth.orbitSize, 3.0 * earth.orbitSize, 3.0 * earth.orbitSize);
@@ -400,6 +499,9 @@ function animate( time ) {
   marsSphere.rotation.y = (time / divisor) * mars.rotationSpeed;
   jupiterSphere.rotation.y = (time / divisor) * jupiter.rotationSpeed;
   saturnSphere.rotation.y = (time / divisor) * saturn.rotationSpeed;
+  uranusSphere.rotation.y = (time / divisor) * uranus.rotationSpeed;
+  neptuneSphere.rotation.y = (time / divisor) * neptune.rotationSpeed;
+  plutoSphere.rotation.y = (time / divisor) * pluto.rotationSpeed;
 //---------------------------------------------------------------------
 // Planet Orbital Rotation Update
 // ---------------------------------------------------------------------
@@ -410,6 +512,9 @@ function animate( time ) {
   updatePlanetRotation(mars, time);
   updatePlanetRotation(jupiter, time);
   updatePlanetRotation(saturn, time);
+  updatePlanetRotation(uranus, time);
+  updatePlanetRotation(neptune, time);
+  updatePlanetRotation(pluto, time);
 
 
 
