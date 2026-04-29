@@ -194,6 +194,23 @@ venus.elipse = venusCurve;
 venus.orbitLine = venusOrbit;
 scene.add(venusOrbit)
 
+//mars
+let marsGroup = new THREE.Group()
+const marsCurve = new THREE.EllipseCurve(
+  //  need to shift the center of the curve to make it look like real life
+  0, 0, //center of the elipse x,y
+  mars.orbitSize, mars.orbitSize, //x then y radius
+  0, 2 * Math.PI, //Start and end angle
+)
+// create a set of points from the elliptical curve then add a new material and add to scene. 
+const marsPoints = marsCurve.getPoints(1000);
+const marsOrbitGeometry = new THREE.BufferGeometry().setFromPoints(marsPoints);
+const marsOrbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+const marsOrbit = new THREE.Line(marsOrbitGeometry, marsOrbitMaterial);
+marsOrbit.rotateX(toRadians(mars.orbitalTilt))
+mars.elipse = marsCurve;
+mars.orbitLine = marsOrbit;
+scene.add(marsOrbit)
 
 
 
@@ -257,7 +274,19 @@ venusGroup.add(venusSphere);
 venus.planetGroup = venusGroup;
 scene.add(venusGroup)
 
-
+//mars
+const marsTexture = textureLoader.load('statics/images/marsTexture.jpg')
+const marsGeometry = new THREE.SphereGeometry(mars.size);
+const marsMaterial = new THREE.MeshPhongMaterial({
+  map: marsTexture,
+  shininess: 0.3,
+});
+const marsSphere = new THREE.Mesh( marsGeometry, marsMaterial );
+marsSphere.rotation.z += toRadians(mars.axialTilt);
+marsSphere.position.set(0,0,0);
+marsGroup.add(marsSphere);
+mars.planetGroup = marsGroup;
+scene.add(marsGroup)
 
 
 
@@ -277,6 +306,8 @@ mercurySphere.castShadow = true;
 mercurySphere.receiveShadow = true;
 venusSphere.castShadow = true;
 venusSphere.receiveShadow = true;
+venusSphere.castShadow = true;
+marsSphere.receiveShadow = true;
 
 // configuring camera to be in a reasonable location
 camera.position.set(-3.0 * earth.orbitSize, 3.0 * earth.orbitSize, 3.0 * earth.orbitSize);
@@ -300,7 +331,7 @@ function animate( time ) {
   earthSphere.rotation.y = (time / divisor) * earth.rotationSpeed;
   mercurySphere.rotation.y = (time / divisor) * mercury.rotationSpeed;
   venusSphere.rotation.y = -(time / divisor) * venus.rotationSpeed;
-
+  marsSphere.rotation.y = (time / divisor) * mars.rotationSpeed;
 //---------------------------------------------------------------------
 // Planet Orbital Rotation Update
 // ---------------------------------------------------------------------
@@ -308,6 +339,7 @@ function animate( time ) {
   updatePlanetRotation(earth, time);
   updatePlanetRotation(mercury, time);
   updatePlanetRotation(venus, time);
+  updatePlanetRotation(mars, time)
 
 
 
