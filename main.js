@@ -56,6 +56,7 @@ const pressedKeys = new Set();
 const cameraMoveDirection = new THREE.Vector3();
 const cameraForward = new THREE.Vector3();
 const cameraRight = new THREE.Vector3();
+const cameraPlanetPos = new THREE.Vector3();
 const orbitPoint = new THREE.Vector3();
 const pointer = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
@@ -64,8 +65,9 @@ const highlightColor = new THREE.Color(0x66ccff);
 let previousFrameTime = 0;
 let pointerIsOverCanvas = false;
 let hoveredPlanet = null;
-
-raycaster.params.Line.threshold = 2.0;
+let clickedPlanet = null;
+// determines the size of the line hitbox
+raycaster.params.Line.threshold = 5.0;
 
 //---------------------------------------------------------------------
 // Event Listeners
@@ -81,10 +83,7 @@ window.addEventListener('keyup', (event) => {
 
 //adds event listeners for determining if pointer is in canvas or not and getting its position
 renderer.domElement.addEventListener('pointermove', (event) => {
-  const rect = renderer.domElement.getBoundingClientRect();
-
-  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  updatePointerPosition(event);
   pointerIsOverCanvas = true;
 });
 
@@ -92,10 +91,49 @@ renderer.domElement.addEventListener('pointerleave', () => {
   pointerIsOverCanvas = false;
 });
 
+renderer.domElement.addEventListener('click', (event) => {
+  const hit = getPlanetHitFromPointer(event);
+
+  if (!hit) {
+    clickedPlanet = null;
+    return;
+  }
+
+  clickedPlanet = hit.object.userData.planet;
+  changeCameraPosition(clickedPlanet);
+});
+
 
 //---------------------------------------------------------------------
 // local functions
 // ---------------------------------------------------------------------
+// gets the location of the pointer on the screen
+function updatePointerPosition(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+}
+// casts a ray to detect what planet group was hit
+function getPlanetHitFromPointer(event) {
+  updatePointerPosition(event);
+  scene.updateMatrixWorld(true);
+  raycaster.setFromCamera(pointer, camera);
+
+  return raycaster.intersectObjects(hoverObjects, false)[0] ?? null;
+}
+
+// changes camera position
+function changeCameraPosition(planet){
+  cameraPlanetPos.set(0,0,0);
+  cameraPlanetPos.set(planet.size * 1.5, planet.size * 1.5, planet.size * 1.5);
+  cameraPlanetPos.add(planet.currentWorldPos)
+  console.log(planet.currentWorldPos);
+  camera.position.copy(cameraPlanetPos);
+  camera.lookAt(planet.currentWorldPos);
+  CameraControls.target.copy(planet.currentWorldPos);
+  CameraControls.update();
+}
 //generic function that takes in planet and current time and then calculates the current position
 // of the planet and sets it accordingly
 function updatePlanetRotation(planet, time = performance.now()) {
@@ -248,7 +286,7 @@ class Planet {
 }
 
 // find the info used to calculate these numbers here: https://science.nasa.gov/solar-system/planets/planet-sizes-and-locations-in-our-solar-system/
-let earth = new Planet("Earth", 1.0, 1.0, 100.0, 23.5, 500.0, -90.0);
+let earth = new Planet("Earth", 1.0, 0.05, 10000.0, 23.5, 500.0, -90.0);
 let jupiter = new Planet("Jupiter",earth.size * 11.2, earth.rotationSpeed * 2.42, earth.orbitalSpeed * 12.0, 3.0, earth.orbitSize * 5.2, earth.orbitalTilt + 1.31);
 let saturn = new Planet("Saturn",earth.size * 9.45, earth.rotationSpeed * 2.24, earth.orbitalSpeed * 29.4, 26.37, earth.orbitSize * 9.5, earth.orbitalTilt + 2.49);
 let uranus = new Planet("Uranus",earth.size * 4.0, earth.rotationSpeed * 0.71, earth.orbitalSpeed * 84, 97.77, earth.orbitSize * 19.2, earth.orbitalTilt + 0.77);
@@ -444,7 +482,7 @@ const sunSphere = new THREE.Mesh( sunGeometry, sunMaterial );
 sunSphere.position.set(0,0,0)
 scene.add( sunSphere );
 
-const sunLight = new THREE.PointLight(0xffffff, 1, 0, 0.999999999 );
+const sunLight = new THREE.PointLight(0xffffff, 10000000, 0, 0.99999999);
 sunSphere.add(sunLight);
 sunSphere.rotation.z += toRadians(sun.axialTilt);
 
