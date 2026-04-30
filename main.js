@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { toRadians } from './js/helper'
+import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.01, 1000000 );
@@ -10,6 +11,32 @@ const renderer = new THREE.WebGLRenderer();
 renderer.setSize( window.innerWidth, window.innerHeight );
 renderer.setAnimationLoop( animate );
 document.body.appendChild( renderer.domElement );
+
+// setup for the label renderer
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(window.innerWidth, window.innerHeight);
+labelRenderer.domElement.style.position = 'fixed';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.left = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+document.body.appendChild(labelRenderer.domElement);
+const labelElement = document.createElement('div');
+Object.assign(labelElement.style, {
+    minWidth: '1.6rem',
+    height: '1rem',
+    border: '1px solid rgba(255, 255, 255, 0.8)',
+    borderRadius: '999px',
+    background: 'rgba(8, 12, 24, 0.72)',
+    color: 'white',
+    display: 'grid',
+    placeItems: 'center',
+    font: '700 0.9rem Arial, sans-serif',
+    textShadow: '0 1px 3px rgba(0, 0, 0, 0.9)',
+    transform: 'translateY(-0.3rem)',
+  });
+const planetLabel = new CSS2DObject(labelElement);
+planetLabel.visible = false;
+scene.add(planetLabel);
 
 const textureLoader = new THREE.TextureLoader();
 
@@ -38,11 +65,12 @@ let previousFrameTime = 0;
 let pointerIsOverCanvas = false;
 let hoveredPlanet = null;
 
-raycaster.params.Line.threshold = 1.0;
+raycaster.params.Line.threshold = 2.0;
 
 //---------------------------------------------------------------------
 // Event Listeners
 // ---------------------------------------------------------------------
+//adds event listeners for key up and down
 window.addEventListener('keydown', (event) => {
   pressedKeys.add(event.code);
 });
@@ -51,6 +79,7 @@ window.addEventListener('keyup', (event) => {
   pressedKeys.delete(event.code);
 });
 
+//adds event listeners for determining if pointer is in canvas or not and getting its position
 renderer.domElement.addEventListener('pointermove', (event) => {
   const rect = renderer.domElement.getBoundingClientRect();
 
@@ -78,6 +107,7 @@ function updatePlanetRotation(planet, time = performance.now()) {
   planet.orbitLine.updateWorldMatrix(true, false);
   planet.orbitLine.localToWorld(orbitPoint);
 
+  planet.currentWorldPos.copy(orbitPoint);
   planet.planetGroup.position.copy(orbitPoint);
 }
 
@@ -111,6 +141,7 @@ function updateCameraMovement(deltaSeconds) {
   CameraControls.update();
 }
 
+// have to do this to create a connection between the orbit and the planet that is on it
 function addHoverTarget(object, planet) {
   object.userData.planet = planet;
   hoverObjects.push(object);
@@ -130,9 +161,25 @@ function setPlanetHighlight(planet, isHighlighted) {
   }
 }
 
+function activatePlanetLabel(planet, isLabeled){
+  if (!isLabeled || !planet) {
+    planetLabel.visible = false;
+    return;
+  }
+
+  labelElement.textContent = planet.name;
+  planetLabel.position.set(
+    planet.currentWorldPos.x,
+    planet.currentWorldPos.y + planet.size + 2,
+    planet.currentWorldPos.z
+  );
+  planetLabel.visible = true;
+}
+
 function updateHoverHighlight() {
   if (!pointerIsOverCanvas) {
     setPlanetHighlight(hoveredPlanet, false);
+    activatePlanetLabel(hoveredPlanet, false);
     hoveredPlanet = null;
     return;
   }
@@ -143,13 +190,17 @@ function updateHoverHighlight() {
   const hits = raycaster.intersectObjects(hoverObjects, false);
   const nextHoveredPlanet = hits.length > 0 ? hits[0].object.userData.planet : null;
 
+
   if (nextHoveredPlanet === hoveredPlanet) {
+    activatePlanetLabel(hoveredPlanet, true);
     return;
   }
 
   setPlanetHighlight(hoveredPlanet, false);
+  activatePlanetLabel(hoveredPlanet, false);
   hoveredPlanet = nextHoveredPlanet;
   setPlanetHighlight(hoveredPlanet, true);
+  activatePlanetLabel(hoveredPlanet, true);
 }
 
 
@@ -179,8 +230,9 @@ scene.background = skyboxCubemap;
 // ---------------------------------------------------------------------
 // setting up blueprint for planets
 class Planet {
-    constructor(size, rotationSpeed, orbitalSpeed, axialTilt, orbitSize, orbitalTilt, orbitLine, planetGroup) {
-        //these are calculated using meteres as a ratio
+    constructor(name, size, rotationSpeed, orbitalSpeed, axialTilt, orbitSize, orbitalTilt, orbitLine, planetGroup) {
+        this.name = name  
+      //these are calculated using meteres as a ratio
         this.size = size
         this.rotationSpeed = rotationSpeed
         this.orbitalSpeed = orbitalSpeed
@@ -191,21 +243,21 @@ class Planet {
         //this is the points from the orbit calculated above
         this.orbitLine = orbitLine
         this.planetGroup = planetGroup
+        this.currentWorldPos = new THREE.Vector3(0,0,0)
     }
 }
 
 // find the info used to calculate these numbers here: https://science.nasa.gov/solar-system/planets/planet-sizes-and-locations-in-our-solar-system/
-let earth = new Planet(1.0, 1.0, 100.0, 23.5, 500.0, -90.0);
-let jupiter = new Planet(earth.size * 11.2, earth.rotationSpeed * 2.42, earth.orbitalSpeed * 12.0, 3.0, earth.orbitSize * 5.2, earth.orbitalTilt + 1.31);
-let saturn = new Planet(earth.size * 9.45, earth.rotationSpeed * 2.24, earth.orbitalSpeed * 29.4, 26.37, earth.orbitSize * 9.5, earth.orbitalTilt + 2.49);
-let uranus = new Planet(earth.size * 4.0, earth.rotationSpeed * 0.71, earth.orbitalSpeed * 84, 97.77, earth.orbitSize * 19.2, earth.orbitalTilt + 0.77);
-let neptune = new Planet(earth.size * 3.88, earth.rotationSpeed * 0.67, earth.orbitalSpeed * 165.0, 28.0, earth.orbitSize * 30.1, earth.orbitalTilt + 1.77);
-let venus = new Planet(earth.size * 0.95, earth.rotationSpeed * 0.004, earth.orbitalSpeed * 0.61, 3.0, earth.orbitSize * 0.72, earth.orbitalTilt + 3.39);
-let mars = new Planet(earth.size * 0.53, earth.rotationSpeed * 1.025, earth.orbitalSpeed * 1.88, 25.0, earth.orbitSize * 1.52, earth.orbitalTilt + 1.85);
-let mercury = new Planet(earth.size * 0.38, earth.rotationSpeed * 59.0, earth.orbitalSpeed * 0.241, 2.0, earth.orbitSize * 0.39, earth.orbitalTilt + 7.01);
-let pluto = new Planet(earth.size * 0.19, earth.rotationSpeed * 6.38, earth.orbitalSpeed * 248.0, 57.0, earth.orbitSize * 39.5, earth.orbitalTilt + 17.14);
-let sun = new Planet(earth.size * 100.0, earth.rotationSpeed * 36.0, 0.0, 0);
-const planetArray = [earth, jupiter, saturn, uranus, neptune, venus, mars, mercury, pluto]
+let earth = new Planet("Earth", 1.0, 1.0, 100.0, 23.5, 500.0, -90.0);
+let jupiter = new Planet("Jupiter",earth.size * 11.2, earth.rotationSpeed * 2.42, earth.orbitalSpeed * 12.0, 3.0, earth.orbitSize * 5.2, earth.orbitalTilt + 1.31);
+let saturn = new Planet("Saturn",earth.size * 9.45, earth.rotationSpeed * 2.24, earth.orbitalSpeed * 29.4, 26.37, earth.orbitSize * 9.5, earth.orbitalTilt + 2.49);
+let uranus = new Planet("Uranus",earth.size * 4.0, earth.rotationSpeed * 0.71, earth.orbitalSpeed * 84, 97.77, earth.orbitSize * 19.2, earth.orbitalTilt + 0.77);
+let neptune = new Planet("Neptune",earth.size * 3.88, earth.rotationSpeed * 0.67, earth.orbitalSpeed * 165.0, 28.0, earth.orbitSize * 30.1, earth.orbitalTilt + 1.77);
+let venus = new Planet("Venus",earth.size * 0.95, earth.rotationSpeed * 0.004, earth.orbitalSpeed * 0.61, 3.0, earth.orbitSize * 0.72, earth.orbitalTilt + 3.39);
+let mars = new Planet("Mars",earth.size * 0.53, earth.rotationSpeed * 1.025, earth.orbitalSpeed * 1.88, 25.0, earth.orbitSize * 1.52, earth.orbitalTilt + 1.85);
+let mercury = new Planet("Mercury",earth.size * 0.38, earth.rotationSpeed * 59.0, earth.orbitalSpeed * 0.241, 2.0, earth.orbitSize * 0.39, earth.orbitalTilt + 7.01);
+let pluto = new Planet("Pluto",earth.size * 0.19, earth.rotationSpeed * 6.38, earth.orbitalSpeed * 248.0, 57.0, earth.orbitSize * 39.5, earth.orbitalTilt + 17.14);
+let sun = new Planet("Sun",earth.size * 100.0, earth.rotationSpeed * 36.0, 0.0, 0);
 
 //---------------------------------------------------------------------
 // Orbital elipse setup
@@ -548,7 +600,7 @@ addHoverTarget(plutoSphere, pluto);
 // configuring shadowmap
 renderer.shadowMap.enabled = true;
 sunLight.castShadow = true;
-sunLight.power = 2000;
+sunLight.power = 20000;
 
 earthSphere.castShadow = true;
 earthSphere.receiveShadow = true;
@@ -623,4 +675,5 @@ function animate( time ) {
 
 
   renderer.render( scene, camera );
+  labelRenderer.render(scene, camera)
 } 
