@@ -138,7 +138,7 @@ function changeCameraPosition(planet){
 // of the planet and sets it accordingly
 function updatePlanetRotation(planet, time = performance.now()) {
   const seconds = time / 1000;
-  const orbitProgress = (seconds / planet.orbitalSpeed) % earth.orbitalSpeed;
+  const orbitProgress = (seconds / planet.orbitalSpeed) % 1;
 
   const p = planet.elipse.getPoint(orbitProgress);
   orbitPoint.set(p.x, p.y, 0);
@@ -147,6 +147,21 @@ function updatePlanetRotation(planet, time = performance.now()) {
 
   planet.currentWorldPos.copy(orbitPoint);
   planet.planetGroup.position.copy(orbitPoint);
+}
+
+function updateMoonRotation(moon, time = performance.now()) {
+  const seconds = time / 1000;
+  const orbitProgress = (seconds / moon.orbitalSpeed) % 1;
+
+  const p = moon.elipse.getPoint(orbitProgress);
+
+  orbitPoint.set(p.x, p.y, 0);
+  orbitPoint.applyEuler(moon.orbitLine.rotation);
+
+  moon.planetGroup.position.copy(orbitPoint);
+
+  moon.planetGroup.updateWorldMatrix(true, false);
+  moon.planetGroup.getWorldPosition(moon.currentWorldPos);
 }
 
 // adds/subs camera looking direction to the current camera direction to get new pos to make it look like you are flying
@@ -183,6 +198,55 @@ function updateCameraMovement(deltaSeconds) {
 function addHoverTarget(object, planet) {
   object.userData.planet = planet;
   hoverObjects.push(object);
+}
+
+function createMoon(parentGroup, moon, texturePath) {
+  const moonGroup = new THREE.Group();
+
+  const moonTexture = textureLoader.load(texturePath);
+  const moonGeometry = new THREE.SphereGeometry(moon.size);
+  const moonMaterial = new THREE.MeshPhongMaterial({
+    map: moonTexture,
+    shininess: 0.3,
+  });
+
+  const moonSphere = new THREE.Mesh(moonGeometry, moonMaterial);
+  moonSphere.rotation.z += toRadians(moon.axialTilt);
+  moonGroup.add(moonSphere);
+
+  moon.planetGroup = moonGroup;
+  moon.planetMesh = moonSphere;
+
+  parentGroup.add(moonGroup);
+  addHoverTarget(moonSphere, moon);
+
+  const moonCurve = new THREE.EllipseCurve(
+    0, 0,
+    moon.orbitSize, moon.orbitSize,
+    0, 2 * Math.PI
+  );
+
+  const moonPoints = moonCurve.getPoints(200);
+  const moonOrbitGeometry = new THREE.BufferGeometry().setFromPoints(moonPoints);
+  const moonOrbitMaterial = new THREE.LineBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.8
+  });
+
+  const moonOrbit = new THREE.Line(moonOrbitGeometry, moonOrbitMaterial);
+  moonOrbit.rotateX(toRadians(moon.orbitalTilt));
+
+  moon.elipse = moonCurve;
+  moon.orbitLine = moonOrbit;
+
+  parentGroup.add(moonOrbit);
+  addHoverTarget(moonOrbit, moon);
+
+  moonSphere.castShadow = true;
+  moonSphere.receiveShadow = true;
+
+  return moonSphere;
 }
 
 function setPlanetHighlight(planet, isHighlighted) {
@@ -285,6 +349,11 @@ class Planet {
     }
 }
 
+// Helper function for orbital speeds
+function computeOrbitalSpeed(distance, k = 0.05) {
+  return Math.pow(distance, 1.5) * k;
+}
+
 // find the info used to calculate these numbers here: https://science.nasa.gov/solar-system/planets/planet-sizes-and-locations-in-our-solar-system/
 let earth = new Planet("Earth", 1.0, 0.05, 10000.0, 23.5, 500.0, -90.0);
 let jupiter = new Planet("Jupiter",earth.size * 11.2, earth.rotationSpeed * 2.42, earth.orbitalSpeed * 12.0, 3.0, earth.orbitSize * 5.2, earth.orbitalTilt + 1.31);
@@ -296,6 +365,10 @@ let mars = new Planet("Mars",earth.size * 0.53, earth.rotationSpeed * 1.025, ear
 let mercury = new Planet("Mercury",earth.size * 0.38, earth.rotationSpeed * 59.0, earth.orbitalSpeed * 0.241, 2.0, earth.orbitSize * 0.39, earth.orbitalTilt + 7.01);
 let pluto = new Planet("Pluto",earth.size * 0.19, earth.rotationSpeed * 6.38, earth.orbitalSpeed * 248.0, 57.0, earth.orbitSize * 39.5, earth.orbitalTilt + 17.14);
 let sun = new Planet("Sun",earth.size * 100.0, earth.rotationSpeed * 36.0, 0.0, 0);
+let moon = new Planet("Moon", earth.size * 0.27, earth.rotationSpeed * 0.036, earth.orbitalSpeed * 0.074, 6.68, earth.size*60, earth.orbitalTilt + 5.14)
+let titan = new Planet( "Titan", earth.size * 0.40, earth.rotationSpeed * 0.064, computeOrbitalSpeed(saturn.size * 25), 0.3, saturn.size * 25, saturn.orbitalTilt + 0.35);
+let rhea = new Planet(  "Rhea", earth.size * 0.12,earth.rotationSpeed * 0.22, computeOrbitalSpeed(saturn.size * 15),0.0, saturn.size * 15,saturn.orbitalTilt + 0.35);
+
 
 //---------------------------------------------------------------------
 // Orbital elipse setup
@@ -317,6 +390,8 @@ earth.elipse = earthCurve;
 earth.orbitLine = earthOrbit;
 scene.add(earthOrbit)
 addHoverTarget(earthOrbit, earth);
+
+
 
 //mercury
 let mercuryGroup = new THREE.Group()
@@ -472,7 +547,7 @@ addHoverTarget(plutoOrbit, pluto);
 
 
 //---------------------------------------------------------------------
-// Plantet Geometry Setup
+// Planet Geometry Setup
 // ---------------------------------------------------------------------
 // sun
 const sunTexture = textureLoader.load('statics/images/sunTexture.jpg');
@@ -502,6 +577,16 @@ earth.planetGroup = earthGroup;
 earth.planetMesh = earthSphere;
 scene.add(earthGroup)
 addHoverTarget(earthSphere, earth);
+// Adding the moon 
+const moonSphere = createMoon(earthGroup, moon, 'statics/images/moonTexture.jpg');
+
+// Earth axis 
+const earthAxisPoints = [new THREE.Vector3(0,earth.size * 1.5,0), new THREE.Vector3(0,-1 * earth.size * 1.5,0)];
+const earthAxisGeom = new THREE.BufferGeometry().setFromPoints(earthAxisPoints);
+const earthAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
+const earthAxis = new THREE.Line(earthAxisGeom, earthAxisMat);
+earthAxis.rotation.z = earth.axialTilt;
+earthGroup.add(earthAxis);
 
 //mercury
 const mercuryTexture = textureLoader.load('statics/images/mercuryTexture.jpg')
@@ -519,6 +604,14 @@ mercury.planetMesh = mercurySphere;
 scene.add(mercuryGroup)
 addHoverTarget(mercurySphere, mercury);
 
+// mercury axis 
+const mercuryAxisPoints = [new THREE.Vector3(0,mercury.size * 1.5,0), new THREE.Vector3(0,-1 * mercury.size * 1.5,0)];
+const mercuryAxisGeom = new THREE.BufferGeometry().setFromPoints(mercuryAxisPoints);
+const mercuryAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
+const mercuryAxis = new THREE.Line(mercuryAxisGeom, mercuryAxisMat);
+mercuryAxis.rotation.z = mercury.axialTilt;
+mercuryGroup.add(mercuryAxis);
+
 //venus
 const venusTexture = textureLoader.load('statics/images/venusTexture.jpg')
 const venusGeometry = new THREE.SphereGeometry(venus.size);
@@ -534,6 +627,14 @@ venus.planetGroup = venusGroup;
 venus.planetMesh = venusSphere;
 scene.add(venusGroup)
 addHoverTarget(venusSphere, venus);
+
+// venus axis 
+const venusAxisPoints = [new THREE.Vector3(0,venus.size * 1.5,0), new THREE.Vector3(0,-1 * venus.size * 1.5,0)];
+const venusAxisGeom = new THREE.BufferGeometry().setFromPoints(venusAxisPoints);
+const venusAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
+const venusAxis = new THREE.Line(venusAxisGeom, venusAxisMat);
+venusAxis.rotation.z = venus.axialTilt;
+venusGroup.add(venusAxis);
 
 //mars
 const marsTexture = textureLoader.load('statics/images/marsTexture.jpg')
@@ -551,6 +652,14 @@ mars.planetMesh = marsSphere;
 scene.add(marsGroup)
 addHoverTarget(marsSphere, mars);
 
+// mars axis 
+const marsAxisPoints = [new THREE.Vector3(0,mars.size * 1.5,0), new THREE.Vector3(0,-1 * mars.size * 1.5,0)];
+const marsAxisGeom = new THREE.BufferGeometry().setFromPoints(marsAxisPoints);
+const marsAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
+const marsAxis = new THREE.Line(marsAxisGeom, marsAxisMat);
+marsAxis.rotation.z = mars.axialTilt;
+marsGroup.add(marsAxis);
+
 //jupiter
 const jupiterTexture = textureLoader.load('statics/images/jupiterTexture.jpg')
 const jupiterGeometry = new THREE.SphereGeometry(jupiter.size);
@@ -567,6 +676,14 @@ jupiter.planetMesh = jupiterSphere;
 scene.add(jupiterGroup)
 addHoverTarget(jupiterSphere, jupiter);
 
+// jupiter axis 
+const jupiterAxisPoints = [new THREE.Vector3(0,jupiter.size * 1.5,0), new THREE.Vector3(0,-1 * jupiter.size * 1.5,0)];
+const jupiterAxisGeom = new THREE.BufferGeometry().setFromPoints(jupiterAxisPoints);
+const jupiterAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
+const jupiterAxis = new THREE.Line(jupiterAxisGeom, jupiterAxisMat);
+jupiterAxis.rotation.z = jupiter.axialTilt;
+jupiterGroup.add(jupiterAxis);
+
 //saturn
 const saturnTexture = textureLoader.load('statics/images/saturnTexture.jpg')
 const saturnGeometry = new THREE.SphereGeometry(saturn.size);
@@ -582,6 +699,16 @@ saturn.planetGroup = saturnGroup;
 saturn.planetMesh = saturnSphere;
 scene.add(saturnGroup)
 addHoverTarget(saturnSphere, saturn);
+const titanSphere = createMoon(saturnGroup,titan,'statics/images/titanTexture.jpg');
+const rheaSphere = createMoon(saturnGroup,rhea,'statics/images/rheaTexture.jpg');
+
+// saturn axis 
+const saturnAxisPoints = [new THREE.Vector3(0,saturn.size * 1.5,0), new THREE.Vector3(0,-1 * saturn.size * 1.5,0)];
+const saturnAxisGeom = new THREE.BufferGeometry().setFromPoints(saturnAxisPoints);
+const saturnAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
+const saturnAxis = new THREE.Line(saturnAxisGeom, saturnAxisMat);
+saturnAxis.rotation.z = saturn.axialTilt;
+saturnGroup.add(saturnAxis);
 
 //uranus
 const uranusTexture = textureLoader.load('statics/images/uranusTexture.jpg')
@@ -599,6 +726,14 @@ uranus.planetMesh = uranusSphere;
 scene.add(uranusGroup)
 addHoverTarget(uranusSphere, uranus);
 
+// uranus axis 
+const uranusAxisPoints = [new THREE.Vector3(0,uranus.size * 1.5,0), new THREE.Vector3(0,-1 * uranus.size * 1.5,0)];
+const uranusAxisGeom = new THREE.BufferGeometry().setFromPoints(uranusAxisPoints);
+const uranusAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
+const uranusAxis = new THREE.Line(uranusAxisGeom, uranusAxisMat);
+uranusAxis.rotation.z = uranus.axialTilt;
+uranusGroup.add(uranusAxis);
+
 //neptune
 const neptuneTexture = textureLoader.load('statics/images/neptuneTexture.jpg')
 const neptuneGeometry = new THREE.SphereGeometry(neptune.size);
@@ -615,6 +750,14 @@ neptune.planetMesh = neptuneSphere;
 scene.add(neptuneGroup)
 addHoverTarget(neptuneSphere, neptune);
 
+// neptune axis 
+const neptuneAxisPoints = [new THREE.Vector3(0,neptune.size * 1.5,0), new THREE.Vector3(0,-1 * neptune.size * 1.5,0)];
+const neptuneAxisGeom = new THREE.BufferGeometry().setFromPoints(neptuneAxisPoints);
+const neptuneAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
+const neptuneAxis = new THREE.Line(neptuneAxisGeom, neptuneAxisMat);
+neptuneAxis.rotation.z = neptune.axialTilt;
+neptuneGroup.add(neptuneAxis);
+
 //pluto
 const plutoTexture = textureLoader.load('statics/images/plutoTexture.jpg')
 const plutoGeometry = new THREE.SphereGeometry(pluto.size);
@@ -630,6 +773,14 @@ pluto.planetGroup = plutoGroup;
 pluto.planetMesh = plutoSphere;
 scene.add(plutoGroup)
 addHoverTarget(plutoSphere, pluto);
+
+// pluto axis 
+const plutoAxisPoints = [new THREE.Vector3(0,pluto.size * 1.5,0), new THREE.Vector3(0,-1 * pluto.size * 1.5,0)];
+const plutoAxisGeom = new THREE.BufferGeometry().setFromPoints(plutoAxisPoints);
+const plutoAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
+const plutoAxis = new THREE.Line(plutoAxisGeom, plutoAxisMat);
+plutoAxis.rotation.z = pluto.axialTilt;
+plutoGroup.add(plutoAxis);
 
 
 
@@ -658,6 +809,8 @@ neptuneSphere.castShadow = true;
 neptuneSphere.receiveShadow = true;
 plutoSphere.castShadow = true;
 plutoSphere.receiveShadow = true;
+moonSphere.castShadow = true;
+moonSphere.receiveShadow = true;
 
 
 // configuring camera to be in a reasonable location
@@ -688,16 +841,22 @@ function animate( time ) {
   uranusSphere.rotation.y = (time / divisor) * uranus.rotationSpeed;
   neptuneSphere.rotation.y = (time / divisor) * neptune.rotationSpeed;
   plutoSphere.rotation.y = (time / divisor) * pluto.rotationSpeed;
+  moonSphere.rotation.y = (time / divisor) * moon.rotationSpeed;
+  titanSphere.rotation.y = (time / divisor) * titan.rotationSpeed;
+  rheaSphere.rotation.y = (time / divisor) * rhea.rotationSpeed;
 //---------------------------------------------------------------------
 // Planet Orbital Rotation Update
 // ---------------------------------------------------------------------
 
   updatePlanetRotation(earth, time);
+  updateMoonRotation(moon, time);
   updatePlanetRotation(mercury, time);
   updatePlanetRotation(venus, time);
   updatePlanetRotation(mars, time);
   updatePlanetRotation(jupiter, time);
   updatePlanetRotation(saturn, time);
+  updateMoonRotation(titan, time);
+  updateMoonRotation(rhea, time);
   updatePlanetRotation(uranus, time);
   updatePlanetRotation(neptune, time);
   updatePlanetRotation(pluto, time);
