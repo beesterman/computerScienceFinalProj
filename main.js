@@ -585,7 +585,7 @@ const earthAxisPoints = [new THREE.Vector3(0,earth.size * 1.5,0), new THREE.Vect
 const earthAxisGeom = new THREE.BufferGeometry().setFromPoints(earthAxisPoints);
 const earthAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
 const earthAxis = new THREE.Line(earthAxisGeom, earthAxisMat);
-earthAxis.rotation.z = earth.axialTilt;
+earthAxis.rotation.z += toRadians(earth.axialTilt);
 earthGroup.add(earthAxis);
 
 //mercury
@@ -609,7 +609,7 @@ const mercuryAxisPoints = [new THREE.Vector3(0,mercury.size * 1.5,0), new THREE.
 const mercuryAxisGeom = new THREE.BufferGeometry().setFromPoints(mercuryAxisPoints);
 const mercuryAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
 const mercuryAxis = new THREE.Line(mercuryAxisGeom, mercuryAxisMat);
-mercuryAxis.rotation.z = mercury.axialTilt;
+mercuryAxis.rotation.z += toRadians(mercury.axialTilt);
 mercuryGroup.add(mercuryAxis);
 
 //venus
@@ -633,7 +633,7 @@ const venusAxisPoints = [new THREE.Vector3(0,venus.size * 1.5,0), new THREE.Vect
 const venusAxisGeom = new THREE.BufferGeometry().setFromPoints(venusAxisPoints);
 const venusAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
 const venusAxis = new THREE.Line(venusAxisGeom, venusAxisMat);
-venusAxis.rotation.z = venus.axialTilt;
+venusAxis.rotation.z += toRadians(venus.axialTilt);
 venusGroup.add(venusAxis);
 
 //mars
@@ -657,7 +657,7 @@ const marsAxisPoints = [new THREE.Vector3(0,mars.size * 1.5,0), new THREE.Vector
 const marsAxisGeom = new THREE.BufferGeometry().setFromPoints(marsAxisPoints);
 const marsAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
 const marsAxis = new THREE.Line(marsAxisGeom, marsAxisMat);
-marsAxis.rotation.z = mars.axialTilt;
+marsAxis.rotation.z += toRadians(mars.axialTilt);
 marsGroup.add(marsAxis);
 
 //jupiter
@@ -681,7 +681,7 @@ const jupiterAxisPoints = [new THREE.Vector3(0,jupiter.size * 1.5,0), new THREE.
 const jupiterAxisGeom = new THREE.BufferGeometry().setFromPoints(jupiterAxisPoints);
 const jupiterAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
 const jupiterAxis = new THREE.Line(jupiterAxisGeom, jupiterAxisMat);
-jupiterAxis.rotation.z = jupiter.axialTilt;
+jupiterAxis.rotation.z += toRadians(jupiter.axialTilt);
 jupiterGroup.add(jupiterAxis);
 
 //saturn
@@ -707,7 +707,7 @@ const saturnAxisPoints = [new THREE.Vector3(0,saturn.size * 1.5,0), new THREE.Ve
 const saturnAxisGeom = new THREE.BufferGeometry().setFromPoints(saturnAxisPoints);
 const saturnAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
 const saturnAxis = new THREE.Line(saturnAxisGeom, saturnAxisMat);
-saturnAxis.rotation.z = saturn.axialTilt;
+saturnAxis.rotation.z += toRadians(saturn.axialTilt);
 saturnGroup.add(saturnAxis);
 
 //uranus
@@ -731,7 +731,7 @@ const uranusAxisPoints = [new THREE.Vector3(0,uranus.size * 1.5,0), new THREE.Ve
 const uranusAxisGeom = new THREE.BufferGeometry().setFromPoints(uranusAxisPoints);
 const uranusAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
 const uranusAxis = new THREE.Line(uranusAxisGeom, uranusAxisMat);
-uranusAxis.rotation.z = uranus.axialTilt;
+uranusAxis.rotation.z += toRadians(uranus.axialTilt);
 uranusGroup.add(uranusAxis);
 
 //neptune
@@ -755,7 +755,7 @@ const neptuneAxisPoints = [new THREE.Vector3(0,neptune.size * 1.5,0), new THREE.
 const neptuneAxisGeom = new THREE.BufferGeometry().setFromPoints(neptuneAxisPoints);
 const neptuneAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
 const neptuneAxis = new THREE.Line(neptuneAxisGeom, neptuneAxisMat);
-neptuneAxis.rotation.z = neptune.axialTilt;
+neptuneAxis.rotation.z += toRadians(neptune.axialTilt);
 neptuneGroup.add(neptuneAxis);
 
 //pluto
@@ -779,7 +779,7 @@ const plutoAxisPoints = [new THREE.Vector3(0,pluto.size * 1.5,0), new THREE.Vect
 const plutoAxisGeom = new THREE.BufferGeometry().setFromPoints(plutoAxisPoints);
 const plutoAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
 const plutoAxis = new THREE.Line(plutoAxisGeom, plutoAxisMat);
-plutoAxis.rotation.z = pluto.axialTilt;
+plutoAxis.rotation.z += toRadians(pluto.axialTilt);
 plutoGroup.add(plutoAxis);
 
 
@@ -833,14 +833,23 @@ function animate( time ) {
   
   sunSphere.rotation.y = (time / divisor) * sun.rotationSpeed;
   earthSphere.rotation.y = (time / divisor) * earth.rotationSpeed;
+  earthAxis.rotation.y = (time / divisor) * earth.rotationSpeed;
   mercurySphere.rotation.y = (time / divisor) * mercury.rotationSpeed;
+  mercuryAxis.rotation.y = (time / divisor) * mercury.rotationSpeed;
   venusSphere.rotation.y = -(time / divisor) * venus.rotationSpeed;
+  venusAxis.rotation.y = (time / divisor) * venus.rotationSpeed;
   marsSphere.rotation.y = (time / divisor) * mars.rotationSpeed;
+  marsAxis.rotation.y = (time / divisor) * mars.rotationSpeed;
   jupiterSphere.rotation.y = (time / divisor) * jupiter.rotationSpeed;
+  jupiterAxis.rotation.y = (time / divisor) * jupiter.rotationSpeed;
   saturnSphere.rotation.y = (time / divisor) * saturn.rotationSpeed;
+  saturnAxis.rotation.y = (time / divisor) * saturn.rotationSpeed;
   uranusSphere.rotation.y = (time / divisor) * uranus.rotationSpeed;
+  uranusAxis.rotation.y = (time / divisor) * uranus.rotationSpeed;
   neptuneSphere.rotation.y = (time / divisor) * neptune.rotationSpeed;
+  neptuneAxis.rotation.y = (time / divisor) * neptune.rotationSpeed;
   plutoSphere.rotation.y = (time / divisor) * pluto.rotationSpeed;
+  plutoAxis.rotation.y = (time / divisor) * pluto.rotationSpeed;
   moonSphere.rotation.y = (time / divisor) * moon.rotationSpeed;
   titanSphere.rotation.y = (time / divisor) * titan.rotationSpeed;
   rheaSphere.rotation.y = (time / divisor) * rhea.rotationSpeed;
