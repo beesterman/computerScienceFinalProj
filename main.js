@@ -685,6 +685,10 @@ jupiterAxis.rotation.z += toRadians(jupiter.axialTilt);
 jupiterGroup.add(jupiterAxis);
 
 //saturn
+const saturnTiltGroup = new THREE.Group();
+saturnTiltGroup.rotation.z = toRadians(saturn.axialTilt);
+saturnGroup.add(saturnTiltGroup);
+
 const saturnTexture = textureLoader.load('statics/images/saturnTexture.jpg')
 const saturnGeometry = new THREE.SphereGeometry(saturn.size);
 const saturnMaterial = new THREE.MeshPhongMaterial({
@@ -692,13 +696,53 @@ const saturnMaterial = new THREE.MeshPhongMaterial({
   shininess: 0.3,
 });
 const saturnSphere = new THREE.Mesh( saturnGeometry, saturnMaterial );
-saturnSphere.rotation.z += toRadians(saturn.axialTilt);
-saturnSphere.position.set(0,0,0);
 saturnGroup.add(saturnSphere);
+saturnSphere.position.set(0,0,0);
+saturnTiltGroup.add(saturnSphere);
 saturn.planetGroup = saturnGroup;
 saturn.planetMesh = saturnSphere;
 scene.add(saturnGroup)
 addHoverTarget(saturnSphere, saturn);
+
+// Saturn rings
+const saturnRingColor = textureLoader.load('statics/images/saturnringcolor.jpg');
+const saturnRingAlpha = textureLoader.load('statics/images/saturnringpattern.gif');
+
+saturnRingColor.colorSpace = THREE.SRGBColorSpace;
+
+const saturnRingGeometry = new THREE.RingGeometry(
+  saturn.size * 1.25,   // inner radius
+  saturn.size * 2.35,   // outer radius
+  256
+);
+
+// Fix UVs so the texture maps across the ring instead of stretching weirdly
+const pos = saturnRingGeometry.attributes.position;
+const uv = saturnRingGeometry.attributes.uv;
+
+for (let i = 0; i < pos.count; i++) {
+  const x = pos.getX(i);
+  const y = pos.getY(i);
+  const radius = Math.sqrt(x * x + y * y);
+
+  const u = (radius - saturn.size * 1.25) / (saturn.size * 2.35 - saturn.size * 1.25);
+  uv.setXY(i, u, 0.5);
+}
+
+const saturnRingMaterial = new THREE.MeshPhongMaterial({
+  map: saturnRingColor,
+  alphaMap: saturnRingAlpha,
+  transparent: true,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+  shininess: 0.2,
+});
+
+const saturnRing = new THREE.Mesh(saturnRingGeometry, saturnRingMaterial);
+
+saturnRing.rotation.x = Math.PI / 2;
+
+saturnTiltGroup.add(saturnRing);
 const titanSphere = createMoon(saturnGroup,titan,'statics/images/titanTexture.jpg');
 const rheaSphere = createMoon(saturnGroup,rhea,'statics/images/rheaTexture.jpg');
 
@@ -707,9 +751,8 @@ const saturnAxisPoints = [new THREE.Vector3(0,saturn.size * 1.5,0), new THREE.Ve
 const saturnAxisGeom = new THREE.BufferGeometry().setFromPoints(saturnAxisPoints);
 const saturnAxisMat = new THREE.LineBasicMaterial({color: 0x00FFFF});
 const saturnAxis = new THREE.Line(saturnAxisGeom, saturnAxisMat);
-saturnAxis.rotation.z += toRadians(saturn.axialTilt);
+saturnAxis.rotation.z = toRadians(saturn.axialTilt);
 saturnGroup.add(saturnAxis);
-
 //uranus
 const uranusTexture = textureLoader.load('statics/images/uranusTexture.jpg')
 const uranusGeometry = new THREE.SphereGeometry(uranus.size);
@@ -843,7 +886,6 @@ function animate( time ) {
   jupiterSphere.rotation.y = (time / divisor) * jupiter.rotationSpeed;
   jupiterAxis.rotation.y = (time / divisor) * jupiter.rotationSpeed;
   saturnSphere.rotation.y = (time / divisor) * saturn.rotationSpeed;
-  saturnAxis.rotation.y = (time / divisor) * saturn.rotationSpeed;
   uranusSphere.rotation.y = (time / divisor) * uranus.rotationSpeed;
   uranusAxis.rotation.y = (time / divisor) * uranus.rotationSpeed;
   neptuneSphere.rotation.y = (time / divisor) * neptune.rotationSpeed;
